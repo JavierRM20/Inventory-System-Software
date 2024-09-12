@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://kit.fontawesome.com/0e2f5244ae.js" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="style.css">
+    <title>Inventory System</title>
+    <link rel="shortcut icon" href="android-chrome-512x512.png" type="image/x-icon">
+</head>
+<body>
+    <header>
+        <h2 class="logo">Inventory System</h2>
+        <nav class="navegacion">
+            <a href="#">Inicio</a>
+            <a href="#">Inventario</a>
+            <a href="#">Productos y Proveedores</a>
+            <a href="#">Despacho</a>
+            <a href="#">Configuración</a>
+            <a href="#">Salir</a>
+</header>
+    <h1>¡Bienvenido a su Sistema de Inventarios!</h1>
+
+    <script>
+        // Verificar si el token existe, si no, redirigir al login
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = 'index.html';
+        }
+
+        // Cargar datos de inventario u otra funcionalidad
+        fetch('http://localhost:3000/inventory', {
+            headers: {
+                'Authorization': token
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log(data);
+        });
+    </script>
+</body>
+</html>
