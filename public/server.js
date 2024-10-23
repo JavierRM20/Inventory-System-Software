@@ -8,12 +8,10 @@ const jwt = require('jsonwebtoken');
 const app = express();
 const port = 3000;
 
-// Configuración de middleware
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(cors());
 
-// Configuración de la base de datos
 const pool = mysql.createPool({
     host: 'localhost',
     user: 'root',
@@ -21,89 +19,97 @@ const pool = mysql.createPool({
     database: 'inventory_db'
 });
 
-// Ruta para el registro de usuarios
+const jwtSecret = 'your_jwt_secret';
+
 app.post('/registrar', async (req, res) => {
     const { username, email, password } = req.body;
     try {
         const hashedPassword = await bcrypt.hash(password, 10);
         pool.query('INSERT INTO users (nombreUsuario, email, passwordHash) VALUES (?, ?, ?)', [username, email, hashedPassword], (error) => {
-            if (error) return res.status(500).json({ error: error.message });
-            res.status(201).json({ message: 'Usuario Registrado' });
+            if (error) return res.status(500).json({ error: 'Error en el registro de usuario' });
+            res.status(201).json({ message: 'Usuario registrado correctamente' });
         });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: 'Error interno del servidor' });
     }
 });
 
-// Ruta para el inicio de sesión
 app.post('/login', (req, res) => {
     const { email, password } = req.body;
     pool.query('SELECT * FROM users WHERE email = ?', [email], async (error, results) => {
-        if (error) return res.status(500).json({ error: error.message });
-        if (results.length === 0) return res.status(401).json({ message: 'Su Usuario no esta registrado' });
+        if (error) return res.status(500).json({ error: 'Error en la base de datos' });
+        if (results.length === 0) return res.status(401).json({ message: 'Usuario no registrado' });
 
         const user = results[0];
-        const isMatch = await bcrypt.compare(password, user.passwordHash);  
-        if (!isMatch) return res.status(401).json({ message: 'Contraseña Incorrecta' });
+        const isMatch = await bcrypt.compare(password, user.passwordHash);
+        if (!isMatch) return res.status(401).json({ message: 'Contraseña incorrecta' });
 
-        const token = jwt.sign({ id: user.id }, 'secret', { expiresIn: '1h' });
+        const token = jwt.sign({ id: user.id }, jwtSecret, { expiresIn: '1h' });
         res.json({ token });
     });
 });
 
-// Middleware para verificar JWT
 const authenticate = (req, res, next) => {
-    const token = req.headers['authorization'];
-    if (!token) return res.status(403).json({ message: 'Token requerido' });
+    const authHeader = req.headers['authorization'];
+    if (!authHeader) return res.status(401).json({ message: 'Token requerido' });
 
-    jwt.verify(token, 'secret', (err, decoded) => {
-        if (err) return res.status(403).json({ message: 'Token inválido' });
+    const token = authHeader.split(' ')[1];
+    jwt.verify(token, jwtSecret, (err, decoded) => {
+        if (err) return res.status(403).json({ message: 'Token no válido o expirado' });
         req.userId = decoded.id;
         next();
     });
 };
 
-// Ruta protegida para la página de inventario (requiere autenticación)
-app.get('/inventory', authenticate, (req, res) => {
-    res.json({ message: 'Bienvenido a la página de inventario' });
-});
-
-// Ruta para obtener los productos
-app.get('/productos', (req, res) => {
+app.get('/inventario', authenticate, (req, res) => {
     pool.query('SELECT * FROM products', (error, results) => {
-        if (error) return res.status(500).json({ error: error.message });
+        if (error) {
+            console.error('Error al obtener inventario:', error.message);
+            return res.status(500).json({ error: 'No se pudo obtener el inventario' });
+        }
         res.json(results);
     });
 });
 
-// Ruta para agregar productos
-app.post('/productos', (req, res) => {
-    const { name, quantity } = req.body;
-    pool.query('INSERT INTO products (name, quantity) VALUES (?, ?)', [name, quantity], (error) => {
-        if (error) return res.status(500).json({ error: error.message });
-        res.status(201).json({ message: 'Producto Agregado' });
+app.get('/productos', authenticate, (req, res) => {
+    pool.query('SELECT * FROM products', (error, results) => {
+        if (error) return res.status(500).json({ error: 'Error al obtener productos' });
+        res.json(results);
     });
 });
 
-// Ruta para despachar productos
-app.post('/despacho', (req, res) => {
+app.post('/productos', authenticate, (req, res) => {
+    const { nombre, cantidad, proveedorId } = req.body;
+    if (!nombre || !cantidad || !proveedorId) {
+        return res.status(400).json({ message: 'Nombre, cantidad y proveedor son requeridos' });
+    }
+    pool.query('INSERT INTO products (nombre, cantidad, proveedor_id) VALUES (?, ?, ?)', [nombre, cantidad, proveedorId], (error) => {
+        if (error) return res.status(500).json({ message: 'Error al agregar producto' });
+        res.status(201).json({ message: 'Producto agregado correctamente' });
+    });
+});
+
+app.get('/proveedores', authenticate, (req, res) => {
+    pool.query('SELECT * FROM suppliers', (error, results) => {
+        if (error) {
+            console.error('Error al obtener proveedores:', error.message);
+            return res.status(500).json({ error: 'No se pudo obtener proveedores' });
+        }
+        res.json(results);
+    });
+});
+
+app.post('/despacho', authenticate, (req, res) => {
     const { productId, quantity } = req.body;
-    pool.query('UPDATE products SET quantity = quantity - ? WHERE id = ?', [quantity, productId], (error) => {
-        if (error) return res.status(500).json({ error: error.message });
-        res.status(200).json({ message: 'Producto Despachado' });
+    pool.query('UPDATE products SET cantidad = cantidad - ? WHERE id = ?', [quantity, productId], (error) => {
+        if (error) {
+            console.error('Error al despachar producto:', error.message);
+            return res.status(500).json({ error: 'Error al despachar producto' });
+        }
+        res.status(200).json({ message: 'Producto despachado' });
     });
 });
 
-// Ruta para recibir productos
-app.post('/recibido', (req, res) => {
-    const { productId, quantity } = req.body;
-    pool.query('UPDATE products SET quantity = quantity + ? WHERE id = ?', [quantity, productId], (error) => {
-        if (error) return res.status(500).json({ error: error.message });
-        res.status(200).json({ message: 'Producto Recibido' });
-    });
-});
-
-// Iniciar el servidor
 app.listen(port, () => {
     console.log(`Servidor corriendo en puerto: http://localhost:${port}`);
 });

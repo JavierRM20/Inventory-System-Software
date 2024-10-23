@@ -33,7 +33,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const email = registerForm.querySelector('input[name="email"]').value;
         const password = registerForm.querySelector('input[name="password"]').value;
 
-        const response = await fetch('http://localhost:3000/register', {
+        const response = await fetch('http://localhost:3000/registrar', {
+
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'

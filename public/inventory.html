@@ -12,32 +12,196 @@
     <header>
         <h2 class="logo">Inventory System</h2>
         <nav class="navegacion">
-            <a href="#">Inicio</a>
-            <a href="#">Inventario</a>
-            <a href="#">Productos y Proveedores</a>
-            <a href="#">Despacho</a>
-            <a href="#">Configuración</a>
-            <a href="#">Salir</a>
-</header>
-    <h1>¡Bienvenido a su Sistema de Inventarios!</h1>
+            <a href="#" id="inicio">Inicio</a>
+            <a href="#" id="inventario">Inventario</a>
+            <a href="#" id="productos-proveedores">Productos y Proveedores</a>
+            <a href="#" id="despacho">Despacho</a>
+            <a href="#" id="configuracion">Configuración</a>
+            <a href="#" id="salir">Salir</a>
+        </nav>
+    </header>
+
+    <main id="content">
+        <h1>¡Bienvenido a su Sistema de Inventarios!</h1>
+    </main>
 
     <script>
-        // Verificar si el token existe, si no, redirigir al login
         const token = localStorage.getItem('token');
         if (!token) {
+            alert('Por favor, inicie sesión para acceder al sistema.');
             window.location.href = 'index.html';
         }
 
-        // Cargar datos de inventario u otra funcionalidad
-        fetch('http://localhost:3000/inventory', {
-            headers: {
-                'Authorization': token
+        const updateContent = (section) => {
+            const content = document.getElementById('content');
+            content.innerHTML = '';
+
+            if (section === 'productos-proveedores') {
+                content.innerHTML = `
+                    <h2>Productos y Proveedores</h2>
+                    <form id="productos-form">
+                        <label for="nombre">Nombre del Producto:</label>
+                        <input type="text" id="nombre" name="nombre" required><br>
+
+                        <label for="cantidad">Cantidad:</label>
+                        <input type="number" id="cantidad" name="cantidad" required><br>
+
+                        <label for="proveedor">Proveedor:</label>
+                        <select id="proveedor" name="proveedor" required></select><br>
+
+                        <button type="submit">Agregar Producto</button>
+                    </form>
+                    <h3>Lista de Productos</h3>
+                    <div id="productos-lista"></div>
+                    <h3>Lista de Proveedores</h3>
+                    <div id="proveedores-lista"></div>
+                `;
+                Promise.all([fetchProductos(), fetchProveedores()]).then(() => {
+                    productosFormHandler();
+                }).catch(console.error);
+            } else if (section === 'inventario') {
+                content.innerHTML = '<h2>Inventario</h2><div id="inventario-lista"></div>';
+                fetchInventario();
+            } else if (section === 'despacho') {
+                content.innerHTML = '<h2>Despacho de Productos</h2><form id="despacho-form">\
+                    <label for="product">ID del Producto:</label>\
+                    <input type="number" id="product" name="product"><br>\
+                    <label for="cantidad">Cantidad a despachar:</label>\
+                    <input type="number" id="cantidad" name="cantidad"><br>\
+                    <button type="submit">Despachar</button>\
+                </form>';
+                despachoFormHandler();
+            } else if (section === 'configuracion') {
+                content.innerHTML = '<h2>Configuración</h2><p>Configuración del sistema.</p>';
+            } else if (section === 'salir') {
+                localStorage.removeItem('token');
+                window.location.href = 'index.html';
+            } else {
+                content.innerHTML = '<h1>¡Bienvenido a su Sistema de Inventarios!</h1>';
             }
-        })
-        .then(response => response.json())
-        .then(data => {
-            console.log(data);
-        });
+        };
+
+        document.getElementById('inicio').addEventListener('click', () => updateContent('inicio'));
+        document.getElementById('inventario').addEventListener('click', () => updateContent('inventario'));
+        document.getElementById('productos-proveedores').addEventListener('click', () => updateContent('productos-proveedores'));
+        document.getElementById('despacho').addEventListener('click', () => updateContent('despacho'));
+        document.getElementById('configuracion').addEventListener('click', () => updateContent('configuracion'));
+        document.getElementById('salir').addEventListener('click', () => updateContent('salir'));
+
+        const fetchInventario = () => {
+            const inventarioLista = document.getElementById('inventario-lista');
+            inventarioLista.innerHTML = '';
+            fetch('http://localhost:3000/inventario', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                data.forEach(item => {
+                    const itemElement = document.createElement('p');
+                    itemElement.textContent = `Producto: ${item.nombre}, Cantidad: ${item.cantidad}`;
+                    inventarioLista.appendChild(itemElement);
+                });
+            })
+            .catch(error => console.error('Error al cargar el inventario:', error));
+        };
+
+        const productosFormHandler = () => {
+            const form = document.getElementById('productos-form');
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const nombre = document.getElementById('nombre').value;
+                const cantidad = document.getElementById('cantidad').value;
+                const proveedorId = document.getElementById('proveedor').value;
+
+                fetch('http://localhost:3000/productos', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ nombre, cantidad, proveedorId })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.message) {
+                        alert('Producto agregado correctamente');
+                        fetchProductos();
+                    } else {
+                        alert('Error al agregar producto');
+                    }
+                })
+                .catch(error => console.error('Error al agregar producto:', error));
+            });
+        };
+
+        const fetchProductos = () => {
+            fetch('http://localhost:3000/productos', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                const productosLista = document.getElementById('productos-lista');
+                productosLista.innerHTML = '';
+                data.forEach(producto => {
+                    const productoElement = document.createElement('p');
+                    productoElement.textContent = `Producto: ${producto.nombre}, Cantidad: ${producto.cantidad}`;
+                    productosLista.appendChild(productoElement);
+                });
+            })
+            .catch(error => console.error('Error al cargar productos:', error));
+        };
+
+        const fetchProveedores = () => {
+            fetch('http://localhost:3000/proveedores', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                const proveedoresSelect = document.getElementById('proveedor');
+                proveedoresSelect.innerHTML = '';
+                data.forEach(proveedor => {
+                    const option = document.createElement('option');
+                    option.value = proveedor.id;
+                    option.textContent = proveedor.name;
+                    proveedoresSelect.appendChild(option);
+                });
+            })
+            .catch(error => console.error('Error al cargar proveedores:', error));
+        };
+
+        const despachoFormHandler = () => {
+            const form = document.getElementById('despacho-form');
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const product = document.getElementById('product').value;
+                const cantidad = document.getElementById('cantidad').value;
+
+                if (cantidad <= 0 || product <= 0) {
+                    alert('Por favor, ingresa valores válidos para el producto y la cantidad');
+                    return;
+                }
+
+                fetch('http://localhost:3000/despacho', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ product, cantidad })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    alert(data.message);
+                })
+                .catch(error => console.error('Error al despachar producto:', error));
+            });
+        };
     </script>
 </body>
 </html>
