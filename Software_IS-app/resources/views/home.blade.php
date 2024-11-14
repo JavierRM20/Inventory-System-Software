@@ -14,7 +14,7 @@
                         </div>
                     @endif
 
-                    {{ __('You are logged in!') }}
+                    {{ __('Bienvenido a su sistema de inventarios') }}
                 </div>
             </div>
         </div>
